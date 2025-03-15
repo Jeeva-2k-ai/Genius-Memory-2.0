@@ -98,8 +98,6 @@ CSS 🎨: For styling and layout of the game.
 
 JavaScript ⚡: For front-end interactivity and game logic.
 
-SweetAlert 🧨: For enhanced alert messages and notifications.
-
 SQLite 📊: For storing game data such as high scores, user progress, etc.
 
 Feel free to fork, contribute, and enjoy this fun brain-training experience! 🎮🧠
