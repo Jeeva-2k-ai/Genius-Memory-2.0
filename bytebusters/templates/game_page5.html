@@ -1,0 +1,306 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Byte Busters</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #1e1e1e;
+            color: white;
+            height: 100vh;
+            flex-direction: column;
+        }
+        .background-video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: -1; opacity: 0.5; }
+        .game-container { background: rgba(0, 0, 0, 0.7); padding: 20px; border-radius: 10px; width: 80%; max-width: 500px; text-align: center; }
+        h1 { font-size: 2rem; margin: 10px 0; }
+        .word-search-grid { display: grid; grid-template-columns: repeat(10, 40px); grid-gap: 5px; justify-content: center; }
+        .word-search-cell { width: 40px; height: 40px; text-align: center; line-height: 40px; border: 1px solid #555; background: #333; color: white; cursor: pointer; }
+        .highlighted { background-color: #FF6600; }
+        .timer { font-size: 1.5rem; margin-top: 20px; }
+        .submit-btn { background-color: #FF6600; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 1rem; margin-top: 20px; }
+        .submit-btn:hover { background-color: #ff4500; }
+        .game-result { display: none; }
+        .danger-game-over { display: none; background: #ff3333; color: white; padding: 15px; border-radius: 10px; font-size: 1.5rem; font-weight: bold; }
+        .cinematic-message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 2rem;
+            font-weight: bold;
+            text-align: center;
+            color: white;
+            padding: 20px;
+            background-color: rgba(0, 0, 0, 0.7);
+            opacity: 0;
+            animation: fadeIn 1s ease-out forwards;
+        }
+        .game-over {
+            background-color: rgba(255, 0, 0, 0.8); /* Red background for Game Over */
+            font-size: 2.5rem;
+            color: white;
+        }
+        .congratulations {
+            background-color: rgba(0, 255, 0, 0.8); /* Green background for Congratulations */
+            font-size: 2.5rem;
+            color: white;
+        }
+        @keyframes fadeIn {
+            0% {
+                opacity: 0;
+                transform: translate(-50%, -60%) scale(0.8);
+            }
+            100% {
+                opacity: 1;
+                transform: translate(-50%, -50%) scale(1);
+            }
+        }
+        @keyframes zoomIn {
+            0% {
+                opacity: 0;
+                transform: translate(-50%, -60%) scale(0.5);
+            }
+            100% {
+                opacity: 1;
+                transform: translate(-50%, -50%) scale(1);
+            }
+        }
+        .congratulations {
+            animation: zoomIn 1s ease-out forwards;
+        }
+        .game-over {
+            animation: zoomIn 1s ease-out forwards;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Background video -->
+    <video autoplay muted loop class="background-video">
+        <source src="{% static 'videos/background5.mp4' %}" type="video/mp4">
+        Your browser does not support the video tag.
+    </video>
+
+    <!-- Game container -->
+    <div class="game-container">
+        <h1>Byte Busters - Word Search</h1>
+        <div class="timer">Time Remaining: <span id="timer">30</span> seconds</div>
+        <div id="question" class="question">What is the hidden word in the grid?</div>
+        <div id="word-search-grid" class="word-search-grid"></div>
+        <button class="submit-btn" onclick="submitAnswer()">Submit Answer</button>
+        <div id="game-result" class="game-result">
+            <p>Your final score is: <span id="final-score">0</span></p>
+            <button class="submit-btn" onclick="restartGame()">Play Again</button>
+        </div>
+        <div id="danger-game-over" class="danger-game-over">Game Over! Time's Up!</div>
+    </div>
+
+    <script>
+let score = 0, timeLeft = 30, countdownTimer, currentQuestionIndex = 0, currentWord = '';
+let gridData = [], selectedCells = [];
+const timerElement = document.getElementById('timer'), wordSearchGrid = document.getElementById('word-search-grid'),
+      gameResultElement = document.getElementById('game-result'), finalScoreElement = document.getElementById('final-score'),
+      gameOverMessage = document.getElementById('danger-game-over');
+const submitButton = document.querySelector('.submit-btn');
+
+// Updated questions array
+const questions = [
+    { question: "Which Data Structure has FIFO Method (First In First Out)?", word: "queue", grid: generateGrid("queue") },
+    { question: "Which Data Structure can store the contiguous elements?", word: "array", grid: generateGrid("array") },
+    { question: "Which Data Structure contains parent & child nodes", word: "bst", grid: generateGrid("bst") }
+];
+
+function startTimer() {
+    countdownTimer = setInterval(function() {
+        timeLeft--; timerElement.textContent = timeLeft;
+        if (timeLeft === 0) { 
+            clearInterval(countdownTimer); 
+            showGameOverMessage(); 
+        }
+    }, 1000);
+}
+
+function generateGrid(word) {
+    const gridSize = 10, grid = Array(gridSize).fill(null).map(() => Array(gridSize).fill(''));
+    const startRow = Math.floor(Math.random() * (gridSize - word.length)), startCol = Math.floor(Math.random() * (gridSize - word.length));
+    for (let i = 0; i < word.length; i++) grid[startRow][startCol + i] = word[i].toUpperCase();
+    for (let row = 0; row < gridSize; row++) for (let col = 0; col < gridSize; col++) if (grid[row][col] === '') grid[row][col] = String.fromCharCode(65 + Math.floor(Math.random() * 26));
+    return grid;
+}
+
+function loadQuestion() {
+    const currentQuestion = questions[currentQuestionIndex];
+    currentWord = currentQuestion.word;
+    document.getElementById('question').innerHTML = currentQuestion.question;
+    renderGrid(currentQuestion.grid);
+}
+
+function renderGrid(grid) {
+    wordSearchGrid.innerHTML = ''; // Clear the grid before rendering
+    grid.forEach((row, rowIndex) => row.forEach((cell, colIndex) => {
+        const cellElement = document.createElement('div');
+        cellElement.classList.add('word-search-cell');
+        cellElement.textContent = cell;
+        cellElement.setAttribute('data-row', rowIndex);
+        cellElement.setAttribute('data-col', colIndex);
+        cellElement.addEventListener('click', () => selectCell(rowIndex, colIndex));
+        wordSearchGrid.appendChild(cellElement);
+    }));
+}
+
+function selectCell(row, col) {
+    const cellElement = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+    // Toggle the selection of the cell
+    if (selectedCells.includes(cellElement)) {
+        selectedCells = selectedCells.filter(cell => cell !== cellElement);
+        cellElement.classList.remove('highlighted');
+    } else {
+        selectedCells.push(cellElement);
+        cellElement.classList.add('highlighted');
+    }
+}
+
+function submitAnswer() {
+    const selectedWord = selectedCells.map(cell => cell.textContent).join('');
+    if (selectedWord.toLowerCase() === currentWord.toLowerCase()) {
+        score += 10;
+        highlightCorrectAnswer(); // Highlight the correct word in the grid
+    } else {
+        alert("Incorrect answer. Try again.");
+    }
+    selectedCells.forEach(cell => cell.classList.remove('highlighted'));  // Reset selected cells
+    selectedCells = [];  // Clear selected cells array
+    currentQuestionIndex++;
+    if (currentQuestionIndex < questions.length) { 
+        loadQuestion();  // Load the next question
+    } else { 
+        clearInterval(countdownTimer); 
+        showGameResult(); 
+    }
+}
+
+function highlightCorrectAnswer() {
+    const cells = document.querySelectorAll('.word-search-cell');
+    const word = currentWord.toUpperCase();
+    const gridSize = 10;
+    let matchedCells = [];
+
+    // Search for matching words in horizontal, vertical, and diagonal directions
+    for (let row = 0; row < gridSize; row++) {
+        for (let col = 0; col < gridSize; col++) {
+            // Check horizontally (left to right)
+            if (col + word.length <= gridSize && cells[row * gridSize + col].textContent === word[0]) {
+                let isMatch = true;
+                for (let k = 0; k < word.length; k++) {
+                    if (cells[row * gridSize + (col + k)].textContent !== word[k]) {
+                        isMatch = false;
+                        break;
+                    }
+                }
+                if (isMatch) {
+                    for (let k = 0; k < word.length; k++) {
+                        matchedCells.push(cells[row * gridSize + (col + k)]);
+                    }
+                    break;
+                }
+            }
+            // Check vertically (top to bottom)
+            if (row + word.length <= gridSize && cells[row * gridSize + col].textContent === word[0]) {
+                let isMatch = true;
+                for (let k = 0; k < word.length; k++) {
+                    if (cells[(row + k) * gridSize + col].textContent !== word[k]) {
+                        isMatch = false;
+                        break;
+                    }
+                }
+                if (isMatch) {
+                    for (let k = 0; k < word.length; k++) {
+                        matchedCells.push(cells[(row + k) * gridSize + col]);
+                    }
+                    break;
+                }
+            }
+            // Check diagonally (top left to bottom right)
+            if (row + word.length <= gridSize && col + word.length <= gridSize && cells[row * gridSize + col].textContent === word[0]) {
+                let isMatch = true;
+                for (let k = 0; k < word.length; k++) {
+                    if (cells[(row + k) * gridSize + (col + k)].textContent !== word[k]) {
+                        isMatch = false;
+                        break;
+                    }
+                }
+                if (isMatch) {
+                    for (let k = 0; k < word.length; k++) {
+                        matchedCells.push(cells[(row + k) * gridSize + (col + k)]);
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
+    // Highlight all matched cells
+    matchedCells.forEach(cell => {
+        cell.classList.add('highlighted');
+    });
+}
+
+function showGameResult() {
+    document.querySelector('.game-container').style.display = 'none';
+    gameResultElement.style.display = 'block';
+    finalScoreElement.textContent = score;
+    if (score === questions.length * 10) {
+        showCongratulationsMessage();
+    } else {
+        showGameOverMessage();
+    }
+}
+
+function showCongratulationsMessage() {
+    const congratsMessage = document.createElement('div');
+    congratsMessage.classList.add('cinematic-message', 'congratulations');
+    congratsMessage.textContent = 'Congratulations! You completed the game!';
+    document.body.appendChild(congratsMessage);
+    setTimeout(function() {
+        window.location.href = "{% url 'menu' %}"; // Redirect to menu after the message
+    }, 3000);
+}
+
+function showGameOverMessage() {
+    // Disable game interactions
+    wordSearchGrid.classList.add('disabled');
+    submitButton.disabled = true;
+
+    const gameOverMessageElement = document.createElement('div');
+    gameOverMessageElement.classList.add('cinematic-message', 'game-over');
+    gameOverMessageElement.textContent = 'Game Over! Time’s up!';
+    document.body.appendChild(gameOverMessageElement);
+    setTimeout(function() {
+        window.location.href = "{% url 'menu' %}"; // Redirect to menu after the message
+    }, 3000);
+}
+
+function restartGame() {
+    score = 0; timeLeft = 30; currentQuestionIndex = 0;
+    selectedCells = [];
+    document.querySelector('.game-container').style.display = 'block';
+    gameResultElement.style.display = 'none';
+    startTimer();
+    loadQuestion(); // Load the first question
+    wordSearchGrid.classList.remove('disabled');
+    submitButton.disabled = false;
+}
+
+restartGame();
+    </script>
+
+</body>
+</html>

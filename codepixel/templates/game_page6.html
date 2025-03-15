@@ -1,0 +1,380 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Codepixel</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #1e1e1e;
+            color: white;
+            overflow: hidden;
+            flex-direction: column;
+        }
+
+        .background-video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: -1;
+            opacity: 0.5;
+        }
+
+        .title-section {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .title-section h1 {
+            font-size: 3rem;
+            margin: 10px 0;
+        }
+
+        .title-section h2 {
+            font-size: 1.5rem;
+            color: #ccc;
+        }
+
+        .game-container {
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 30px;
+            border-radius: 10px;
+            width: 80%;
+            max-width: 900px;
+            text-align: center;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+
+        .question {
+            font-size: 2rem;
+            margin-bottom: 30px;
+        }
+
+        .options {
+            text-align: left;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+        }
+
+        .option {
+            margin: 10px;
+            cursor: pointer;
+        }
+
+        .option img {
+            width: 100%;
+            max-width: 150px;
+            border: 2px solid transparent;
+            transition: border 0.3s ease;
+        }
+
+        .option img:hover {
+            border: 2px solid #FF6600;
+        }
+
+        .timer {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-top: 20px;
+        }
+
+        .submit-btn {
+            background-color: #FF6600;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 5px;
+            font-size: 1.5rem;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: background-color 0.3s ease;
+        }
+
+        .submit-btn:hover {
+            background-color: #ff4500;
+        }
+
+        .submit-btn:disabled {
+            background-color: #777;
+            cursor: not-allowed;
+        }
+
+        .game-result {
+            display: none;
+            margin-top: 30px;
+            font-size: 2rem;
+        }
+
+        .score {
+            font-size: 2.5rem;
+            margin-top: 20px;
+        }
+
+        .cinematic-message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 2.5rem;
+            font-weight: bold;
+            text-align: center;
+            color: white;
+            padding: 20px;
+            background-color: rgba(0, 0, 0, 0.7);
+            opacity: 0;
+            animation: fadeIn 2s ease-out forwards, zoomIn 1s ease-out forwards;
+        }
+
+        .game-over {
+            background-color: rgba(255, 0, 0, 0.8); /* Red background for Game Over */
+        }
+
+        .congratulations {
+            background-color: rgba(0, 255, 0, 0.8); /* Green background for Congratulations */
+        }
+
+        @keyframes fadeIn {
+            0% {
+                opacity: 0;
+            }
+            100% {
+                opacity: 1;
+            }
+        }
+
+        @keyframes zoomIn {
+            0% {
+                opacity: 0;
+                transform: translate(-50%, -60%) scale(0.5);
+            }
+            100% {
+                opacity: 1;
+                transform: translate(-50%, -50%) scale(1);
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Background video -->
+    <video autoplay muted loop class="background-video">
+        <source src="{% static 'videos/background3.mp4' %}" type="video/mp4">
+        Your browser does not support the video tag.
+    </video>
+
+    <!-- Game Container -->
+    <div class="game-container">
+        <!-- Title Section -->
+        <div class="title-section">
+            <h1>CodePixel</h1>
+            <h2>Guess the Correct Logo!</h2>
+        </div>
+
+        <!-- Timer -->
+        <div class="timer">
+            Time Remaining: <span id="timer">30</span> seconds
+        </div>
+
+        <!-- Question Section -->
+        <div class="question" id="question">
+            Which logo represents the correct brand?
+        </div>
+
+        <!-- MCQ Options -->
+        <div class="options" id="options">
+            <!-- MCQ options will be injected here -->
+        </div>
+
+        <!-- Submit button -->
+        <button class="submit-btn" onclick="submitAnswer()" disabled>Submit Answer</button>
+
+        <!-- Game Result Section -->
+        <div class="game-result" id="game-result">
+            <p>Your final score is: <span id="final-score">0</span></p>
+            <button class="submit-btn" onclick="restartGame()">Play Again</button>
+        </div>
+
+    </div>
+
+    <script>
+        let score = 0;
+        let timeLeft = 30;
+        let countdownTimer;
+        let currentQuestionIndex = 0;
+
+        const timerElement = document.getElementById('timer');
+        const questionElement = document.getElementById('question');
+        const optionsElement = document.getElementById('options');
+        const gameResultElement = document.getElementById('game-result');
+        const finalScoreElement = document.getElementById('final-score');
+        const submitButton = document.querySelector('.submit-btn');
+
+        // Disable the submit button initially
+        submitButton.disabled = true;
+
+        const questions = [
+            {
+                question: "Which language is used for creating web pages?",
+                options: [
+                    { logo: "{% static 'options/C.png' %}", value: "C" },
+                    { logo: "{% static 'options/Python.png' %}", value: "Python" },
+                    { logo: "{% static 'options/htmltag.png' %}", value: "HTML" },
+                    { logo: "{% static 'options/Javacore.png' %}", value: "Java" }
+                ],
+                correctAnswer: "HTML"
+            },
+            {
+                question: "Which software is the main partner for IoT?",
+                options: [
+                    { logo: "{% static 'options/Binary.png' %}", value: "Binary" },
+                    { logo: "{% static 'options/Raspberrypi.png' %}", value: "Raspberry Pi" },
+                    { logo: "{% static 'options/Flutter.png' %}", value: "Flutter" },
+                    { logo: "{% static 'options/Swift.png' %}", value: "Swift" }
+                ],
+                correctAnswer: "Raspberry Pi"
+            },
+            {
+                question: "In Angular which language is used?",
+                options: [
+                    { logo: "{% static 'options/TS.png' %}", value: "Typescript" },
+                    { logo: "{% static 'options/C++.png' %}", value: "C++" },
+                    { logo: "{% static 'options/XMLpage.png' %}", value: "XML" },
+                    { logo: "{% static 'options/PHP.png' %}", value: "PHP" }
+                ],
+                correctAnswer: "Typescript"
+            },
+            {
+                question: "Which language is used for writing database queries?",
+                options: [
+                    { logo: "{% static 'options/react.png' %}", value: "React" },
+                    { logo: "{% static 'options/node.png' %}", value: "Node" },
+                    { logo: "{% static 'options/JS.png' %}", value: "Javascript" },
+                    { logo: "{% static 'options/sql.png' %}", value: "SQL" }
+                ],
+                correctAnswer: "SQL"
+            },
+            {
+                question: "In MEAN Stack Web Application, which language is used for creating components for design templates?",
+                options: [
+                    { logo: "{% static 'options/CSS.png' %}", value: "CSS" },
+                    { logo: "{% static 'options/angular.png' %}", value: "Angular" },
+                    { logo: "{% static 'options/JSON.png' %}", value: "JSON" },
+                    { logo: "{% static 'options/c-sharp.png' %}", value: "Csharp" }
+                ],
+                correctAnswer: "Csharp"
+            }
+        ];
+
+        function startTimer() {
+            countdownTimer = setInterval(function() {
+                timeLeft--;
+                timerElement.textContent = timeLeft;
+
+                if (timeLeft === 0) {
+                    clearInterval(countdownTimer);
+                    showGameOverMessage();
+                }
+            }, 1000);
+        }
+
+        function loadQuestion() {
+            const currentQuestion = questions[currentQuestionIndex];
+            questionElement.innerHTML = currentQuestion.question;
+            optionsElement.innerHTML = '';
+
+            currentQuestion.options.forEach(option => {
+                const optionLabel = document.createElement('label');
+                optionLabel.classList.add('option');
+                optionLabel.innerHTML = `
+                    <input type="radio" name="answer" value="${option.value}">
+                    <img src="${option.logo}" alt="${option.value}">
+                `;
+                optionsElement.appendChild(optionLabel);
+            });
+
+            // Add event listener to enable submit button when an option is selected
+            const radioButtons = optionsElement.querySelectorAll('input[name="answer"]');
+            radioButtons.forEach(button => {
+                button.addEventListener('change', function() {
+                    submitButton.disabled = false; // Enable submit button when an option is selected
+                });
+            });
+        }
+
+        function submitAnswer() {
+            const currentQuestion = questions[currentQuestionIndex];
+            const selectedOption = document.querySelector('input[name="answer"]:checked');
+
+            if (selectedOption && selectedOption.value === currentQuestion.correctAnswer) {
+                score += 10;
+            }
+
+            currentQuestionIndex++;
+
+            if (currentQuestionIndex < questions.length) {
+                loadQuestion();
+                submitButton.disabled = true; // Disable the submit button again
+            } else {
+                clearInterval(countdownTimer);
+                showGameResult();
+            }
+        }
+
+        function showGameResult() {
+            document.querySelector('.game-container').style.display = 'none';
+            gameResultElement.style.display = 'block';
+            finalScoreElement.textContent = score;
+
+            if (score >= 30) {
+                showCongratulationsMessage();
+            } else {
+                showGameOverMessage();
+            }
+            setTimeout(function() {
+                window.location.href = "{% url 'menu' %}"; // Redirect to menu after the message
+            }, 3000);
+        }
+
+        function showCongratulationsMessage() {
+            const congratsMessage = document.createElement('div');
+            congratsMessage.classList.add('cinematic-message', 'congratulations');
+            congratsMessage.textContent = 'Congratulations! You completed the game!';
+            document.body.appendChild(congratsMessage);
+        }
+
+        function showGameOverMessage() {
+            const gameOverMessageElement = document.createElement('div');
+            gameOverMessageElement.classList.add('cinematic-message', 'game-over');
+            gameOverMessageElement.textContent = 'Game Over! Better luck next time';
+            document.body.appendChild(gameOverMessageElement);
+        }
+
+        function restartGame() {
+            score = 0;
+            timeLeft = 30;
+            currentQuestionIndex = 0;
+            gameResultElement.style.display = 'none';
+            document.querySelector('.game-container').style.display = 'block';
+            submitButton.disabled = true; // Disable the submit button on restart
+            startTimer();
+            loadQuestion();
+        }
+
+        restartGame();
+    </script>
+
+</body>
+</html>

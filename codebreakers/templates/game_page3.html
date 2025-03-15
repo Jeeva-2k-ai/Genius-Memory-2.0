@@ -1,0 +1,338 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Code Breakers</title>
+    <style>
+        /* Styling for the page */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #1e1e1e;
+            color: white;
+            overflow: hidden;
+            flex-direction: column;
+        }
+
+        .background-video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: -1;
+            opacity: 0.5;
+        }
+
+        .title-section {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .title-section h1 {
+            font-size: 3rem;
+            margin: 10px 0;
+        }
+
+        .title-section h2 {
+            font-size: 1.5rem;
+            color: #ccc;
+        }
+
+        .game-container {
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 30px;
+            border-radius: 10px;
+            width: 80%;
+            max-width: 900px;
+            text-align: center;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+
+        .question {
+            font-size: 2rem;
+            margin-bottom: 30px;
+        }
+
+        .options {
+            text-align: left;
+            margin-bottom: 20px;
+        }
+
+        .option {
+            margin-bottom: 10px;
+        }
+
+        .timer {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-top: 20px;
+        }
+
+        .submit-btn {
+            background-color: #FF6600;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 5px;
+            font-size: 1.5rem;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: background-color 0.3s ease;
+        }
+
+        .submit-btn:disabled {
+            background-color: #888;
+            cursor: not-allowed;
+        }
+
+        .submit-btn:hover:not(:disabled) {
+            background-color: #ff4500;
+        }
+
+        .game-result {
+            display: none;
+            margin-top: 30px;
+            font-size: 2rem;
+        }
+
+        .score {
+            font-size: 2.5rem;
+            margin-top: 20px;
+        }
+
+        .cinematic-message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 2.5rem;
+            font-weight: bold;
+            text-align: center;
+            color: white;
+            padding: 20px;
+            background-color: rgba(0, 0, 0, 0.7);
+            opacity: 0;
+            animation: fadeIn 2s ease-out forwards, zoomIn 1s ease-out forwards;
+        }
+
+        .game-over {
+            background-color: rgba(255, 0, 0, 0.8); /* Red background for Game Over */
+        }
+
+        .congratulations {
+            background-color: rgba(0, 255, 0, 0.8); /* Green background for Congratulations */
+        }
+
+        @keyframes fadeIn {
+            0% {
+                opacity: 0;
+            }
+            100% {
+                opacity: 1;
+            }
+        }
+
+        @keyframes zoomIn {
+            0% {
+                opacity: 0;
+                transform: translate(-50%, -60%) scale(0.5);
+            }
+            100% {
+                opacity: 1;
+                transform: translate(-50%, -50%) scale(1);
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Background video -->
+    <video autoplay muted loop class="background-video">
+        <source src="{% static 'videos/background3.mp4' %}" type="video/mp4">
+        Your browser does not support the video tag.
+    </video>
+
+    <!-- Game Container -->
+    <div class="game-container">
+        <!-- Title Section -->
+        <div class="title-section">
+            <h1>Code Breakers</h1>
+            <h2>Answer the question!</h2>
+        </div>
+
+        <!-- Timer -->
+        <div class="timer">
+            Time Remaining: <span id="timer">30</span> seconds
+        </div>
+
+        <!-- Question Section -->
+        <div class="question" id="question">
+            What is the correct way to declare a variable in JavaScript?
+        </div>
+
+        <!-- MCQ Options -->
+        <div class="options" id="options">
+            <!-- MCQ options will be injected here -->
+        </div>
+
+        <!-- Submit button -->
+        <button class="submit-btn" id="submit-btn" onclick="submitAnswer()" disabled>Submit Answer</button>
+
+        <!-- Game Result Section -->
+        <div class="game-result" id="game-result">
+            <p>Your final score is: <span id="final-score">0</span></p>
+            <button class="submit-btn" onclick="restartGame()">Play Again</button>
+        </div>
+
+    </div>
+
+    <script>
+        let score = 0;
+        let timeLeft = 30;
+        let countdownTimer;
+        let currentQuestionIndex = 0;
+
+        const timerElement = document.getElementById('timer');
+        const questionElement = document.getElementById('question');
+        const optionsElement = document.getElementById('options');
+        const gameResultElement = document.getElementById('game-result');
+        const finalScoreElement = document.getElementById('final-score');
+        const submitButton = document.getElementById('submit-btn');
+
+        const questions = [
+            {
+                question: "What will be the output of the following JavaScript code?\n\nlet x = 10;\nconsole.log(x++);",
+                options: [
+                    "10",
+                    "11",
+                    "undefined",
+                    "error"
+                ],
+                correctAnswer: "11"
+            },
+            {
+                question: "What will be the output of the following Python code?\n\nx = [1, 2, 3]\nprint(x[1:3])",
+                options: [
+                    "[1, 2]",
+                    "[2, 3]",
+                    "[1, 2, 3]",
+                    "IndexError"
+                ],
+                correctAnswer: "[2, 3]"
+            },
+            {
+                question: "What will be the output of the following Python code?\n\nx = 'Hello, world!'\nprint(x.split(','))",
+                options: [
+                    "['Hello', ' world!']",
+                    "['Hello world!']",
+                    "['Hello, world!']",
+                    "error"
+                ],
+                correctAnswer: "['Hello', ' world!']"
+            }
+        ];
+
+        function startTimer() {
+            countdownTimer = setInterval(function() {
+                timeLeft--;
+                timerElement.textContent = timeLeft;
+
+                if (timeLeft === 0) {
+                    clearInterval(countdownTimer);
+                    showGameOverMessage();
+                }
+            }, 1000);
+        }
+
+        function loadQuestion() {
+            const currentQuestion = questions[currentQuestionIndex];
+            questionElement.innerHTML = currentQuestion.question;
+            optionsElement.innerHTML = '';
+            submitButton.disabled = true; // Disable submit initially
+
+            currentQuestion.options.forEach(option => {
+                const optionLabel = document.createElement('label');
+                optionLabel.classList.add('option');
+                optionLabel.innerHTML = `
+                    <input type="radio" name="answer" value="${option}" onclick="enableSubmit()"> ${option}
+                `;
+                optionsElement.appendChild(optionLabel);
+            });
+        }
+
+        function enableSubmit() {
+            // Enable submit button when an option is selected
+            submitButton.disabled = false;
+        }
+
+        function submitAnswer() {
+            const currentQuestion = questions[currentQuestionIndex];
+            const selectedOption = document.querySelector('input[name="answer"]:checked');
+
+            if (selectedOption && selectedOption.value === currentQuestion.correctAnswer) {
+                score += 10;
+            }
+
+            currentQuestionIndex++;
+
+            if (currentQuestionIndex < questions.length) {
+                loadQuestion();
+            } else {
+                clearInterval(countdownTimer);
+                showGameResult();
+            }
+        }
+
+        function showGameResult() {
+            document.querySelector('.game-container').style.display = 'none';
+            gameResultElement.style.display = 'block';
+            finalScoreElement.textContent = score;
+
+            if (score >= 30) {
+                showCongratulationsMessage();
+            } else {
+                showGameOverMessage();
+            }
+            setTimeout(function() {
+                window.location.href = "{% url 'menu' %}"; // Redirect to menu after the message
+            }, 3000);
+        }
+
+        function showCongratulationsMessage() {
+            const congratsMessage = document.createElement('div');
+            congratsMessage.classList.add('cinematic-message', 'congratulations');
+            congratsMessage.textContent = 'Congratulations! You completed the game!';
+            document.body.appendChild(congratsMessage);
+        }
+
+        function showGameOverMessage() {
+            const gameOverMessageElement = document.createElement('div');
+            gameOverMessageElement.classList.add('cinematic-message', 'game-over');
+            gameOverMessageElement.textContent = 'Game Over! Time’s up!';
+            document.body.appendChild(gameOverMessageElement);
+        }
+
+        function restartGame() {
+            score = 0;
+            timeLeft = 30;
+            currentQuestionIndex = 0;
+            gameResultElement.style.display = 'none';
+            document.querySelector('.game-container').style.display = 'block';
+            startTimer();
+            loadQuestion();
+        }
+
+        restartGame();
+    </script>
+
+</body>
+</html>
